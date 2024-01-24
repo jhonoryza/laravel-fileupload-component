@@ -1,0 +1,40 @@
+{
+    "name": "jhonoryza/laravel-fileupload-component",
+    "description": "file upload component",
+    "keywords": [
+        "labkita",
+        "laravel-fileupload-component"
+    ],
+    "type": "library",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "Jhonoryza\\Component\\FileUpload\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "fajar sidik priatna",
+            "email": "jardik.oryza@gmail.com"
+        }
+    ],
+    "require": {
+        "php": "^8.2",
+        "spatie/laravel-medialibrary": "^10.0|^11.0"
+    },
+    "require-dev": {
+        "illuminate/support": "^10.0",
+        "livewire/livewire": "^3.0",
+        "orchestra/testbench": "^8.0",
+        "laravel/framework": "^10.42"
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Jhonoryza\\Component\\FileUpload\\FileUploadServiceProvider"
+            ]
+        }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}
