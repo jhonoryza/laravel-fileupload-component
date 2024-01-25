@@ -2,20 +2,16 @@
 
 namespace Jhonoryza\Component\FileUpload\Livewire;
 
-use Facades\Livewire\Features\SupportFileUploads\GenerateSignedUploadUrl;
 use Illuminate\Contracts\View\View;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Validator;
 use Jhonoryza\Component\FileUpload\Action\ConvertTemporaryUploadedFileToMedia;
 use Jhonoryza\Component\FileUpload\Dto\ViewItem;
 use Jhonoryza\Component\FileUpload\Exceptions\NotFoundException;
+use Jhonoryza\Component\FileUpload\Traits\FileUploadTrait;
 use Livewire\Attributes\Modelable;
 use Livewire\Component;
-use Livewire\Features\SupportFileUploads\FileUploadConfiguration;
-use Livewire\Features\SupportFileUploads\S3DoesntSupportMultipleFileUploads;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
-use Livewire\WithFileUploads;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\MediaCollections\Exceptions\FileDoesNotExist;
 use Spatie\MediaLibrary\MediaCollections\Exceptions\FileIsTooBig;
@@ -25,12 +21,12 @@ use function collect;
 
 class FileUpload extends Component
 {
-    use WithFileUploads;
+    use FileUploadTrait;
 
     /**
      * @var array<TemporaryUploadedFile>
      */
-    public $files = [];
+    public $tempFiles = [];
 
     /**
      * to signal Livewire that if wire:model is declared
@@ -38,7 +34,6 @@ class FileUpload extends Component
      *
      * @var array<TemporaryUploadedFile>
      */
-    #[Modelable]
     public $previews = [];
 
     public string $name;
@@ -58,7 +53,7 @@ class FileUpload extends Component
     public bool $canUploadFile = true;
 
     public function mount(
-        ?string $name = null,
+        string $name,
         ?string $label = null,
         ?string $rules = null,
         bool $multiple = false,
@@ -66,30 +61,39 @@ class FileUpload extends Component
         ?string $collection = null,
         bool $canUploadFile = true
     ): void {
-        $this->name = $name ?? 'media';
+        $this->name = $name;
         $this->label = $label ?? $this->name;
         $this->rules = $rules ?? 'max:10240|mimes:jpeg,png';
         $this->multiple = $multiple;
         $this->uuid = Str::uuid();
         $this->model = $model;
-        $this->collection = $collection;
+        $this->collection = $collection ?? 'default';
         $this->canUploadFile = $canUploadFile;
     }
 
+    /**
+     * validation rules
+     */
     public function getRules(): array
     {
         return [
-            'files.*' => $this->rules,
+            'tempFiles.*' => $this->rules,
         ];
     }
 
+    /**
+     * validation attributes
+     */
     protected function getValidationAttributes(): array
     {
         return [
-            'files.*' => 'file',
+            'tempFiles.*' => 'file',
         ];
     }
 
+    /**
+     * default render function
+     */
     public function render(): View
     {
         return view('file-upload-component::livewire.file-upload', [
@@ -103,75 +107,65 @@ class FileUpload extends Component
     }
 
     /**
+     * this function is called first when the component is rendered
+     * it call from file-upload blade files
+     * if the model already have media the property previews will be filled
+     */
+    public function loadMedia(): void
+    {
+        if (empty($this->previews)) {
+            $this->previews = $this->getMedia($this->name, $this->model, $this->collection ?? 'default');
+            $this->dispatch($this->name . ':onFileReplace', $this->previews);
+        }
+    }
+
+    /**
      * Triggered when files property value updated
      */
     public function updatedFiles(): void
     {
         $this->validate();
 
-        foreach ($this->files as $index => $file) {
-            $this->handleUpload($file, $index);
+        foreach ($this->tempFiles as $file) {
+            $this->handleUpload($file);
         }
 
-        $this->files = [];
+        $this->tempFiles = [];
     }
 
     /**
+     * this will convert TemporaryUploadedFile to Media class
+     * then will add it to previews property
+     *
      * @throws NotFoundException
      * @throws FileDoesNotExist
      * @throws FileIsTooBig
      */
-    protected function handleUpload(TemporaryUploadedFile $file, int $index): void
+    protected function handleUpload(TemporaryUploadedFile $file): void
     {
         $media = ConvertTemporaryUploadedFileToMedia::execute($file);
-        $this->previews[$index] = $this->formatMediaData($media);
-        $this->dispatch($this->name . ':temporary-upload-finished', $this->previews[$index]);
+        $this->previews[$media->uuid] = $this->formatMediaData($media);
+        $this->dispatch($this->name . ':temporary-upload-finished');
+        $this->dispatch($this->name . ':onFileAdded', $this->previews[$media->uuid]);
     }
 
+    /**
+     * clear temporary files after validation error
+     */
     public function boot(): void
     {
         $this->withValidator(function ($validator) {
             $validator->after(function (Validator $validator) {
                 if ($validator->errors()->count() > 0) {
-                    $this->files = [];
+                    $this->tempFiles = [];
                 }
             });
         });
     }
 
     /**
-     * Override default _startUpload method to dispatch our start upload events
-     *
-     * @param  string  $name
-     * @param  string  $fileInfo
-     * @param  bool  $isMultiple
-     * @return void
-     *
-     * @throws \Throwable
+     * helper function to get media from the model
      */
-    public function _startUpload($name, $fileInfo, $isMultiple)
-    {
-        $this->dispatch($this->name.':temporary-upload-started');
-        if (FileUploadConfiguration::isUsingS3()) {
-            throw_if($isMultiple, S3DoesntSupportMultipleFileUploads::class);
-
-            $file = UploadedFile::fake()->create($fileInfo[0]['name'], $fileInfo[0]['size'] / 1024, $fileInfo[0]['type']);
-
-            $this->dispatch('upload:generatedSignedUrlForS3', name: $name, payload: GenerateSignedUploadUrl::forS3($file))->self();
-
-            return;
-        }
-
-        $this->dispatch('upload:generatedSignedUrl', name: $name, url: GenerateSignedUploadUrl::forLocal())->self();
-    }
-
-    public function loadMedia(): void
-    {
-        if (empty($this->previews)) {
-            $this->previews = $this->getMedia($this->name, $this->model, $this->collection ?? 'default');
-        }
-    }
-
     protected function getMedia(string $name, HasMedia $model, string $collection): array
     {
         return old($name) ? old($name) : $model
@@ -181,6 +175,9 @@ class FileUpload extends Component
             ->toArray();
     }
 
+    /**
+     * helper function to format media data
+     */
     protected function formatMediaData(Media $media): array
     {
         return [
@@ -196,10 +193,15 @@ class FileUpload extends Component
         ];
     }
 
+    /**
+     * this will be called from file-upload blade files
+     * when remove button is clicked
+     */
     public function remove(string $uuid): void
     {
         $this->previews = collect($this->previews)
             ->reject(fn (array $mediaItem) => $mediaItem['uuid'] === $uuid)
             ->toArray();
+        $this->dispatch($this->name . ':onFileReplace', $this->previews);
     }
 }
