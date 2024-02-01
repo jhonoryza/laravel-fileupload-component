@@ -1,5 +1,17 @@
 # Laravel File Upload Component
 
+<p align="center">
+    <a href="https://packagist.org/packages/jhonoryza/laravel-fileupload-component">
+    <img src="https://poser.pugx.org/jhonoryza/laravel-fileupload-component/d/total.svg" alt="Total Downloads">
+    </a>
+    <a href="https://packagist.org/packages/jhonoryza/laravel-fileupload-component">
+        <img src="https://poser.pugx.org/jhonoryza/laravel-fileupload-component/v/stable.svg" alt="Latest Stable Version">
+    </a>
+    <a href="https://packagist.org/packages/jhonoryza/laravel-fileupload-component">
+        <img src="https://poser.pugx.org/jhonoryza/laravel-fileupload-component/license.svg" alt="License">
+    </a>
+</p>
+
 laravel livewire file upload component
 
 ## Requirement
@@ -31,7 +43,7 @@ class Setting extends Model implements HasMedia
 {
     use InteractsWithMedia;
     use InteractsWithFileUpload;
-    
+
     public function registerMediaCollections() : void
     {
         $this->addMediaCollection('settings');
@@ -44,12 +56,12 @@ prepare livewire form class
 ```php
    /**
     * property to store multiple images
-    */ 
-    public $images = []; 
-   
+    */
+    public $images = [];
+
    /**
     * listener when there is onFileReplace event from the component
-    */ 
+    */
    #[On('images:onFileReplace')]
    public function replaceImages(array $images): void
    {
@@ -58,18 +70,18 @@ prepare livewire form class
 
    /**
     * listener when there is onFileAdded event from the component
-    */ 
+    */
    #[On('images:onFileAdded')]
    public function addToImages(array $file): void
    {
        $this->images[$file['uuid']] = $file;
    }
-    
+
    /**
     * form save function example, setting is a Model
     * we call syncFileUploadRequest function
     * to save images to media library
-    */ 
+    */
     public function save()
     {
         $this->setting
@@ -123,7 +135,7 @@ change `media` with the `name` property, example `name` property is images
         x-bind:style="disable ? 'cursor: not-allowed' : ''"
         x-on:images:temporary-upload-started.window="disable = true"
         x-on:images:temporary-upload-finished.window="disable = false"
-        type="submit" 
+        type="submit"
         class="btn btn-primary"
     >
         Update Setting
@@ -141,7 +153,7 @@ or you can listen to default livewire file upload event like this
         x-on:livewire-upload-error.window="disable = false"
         x-on:livewire-upload-progress.window="disable = true"
         x-on:livewire-upload-finish.window="disable = false"
-        type="submit" 
+        type="submit"
         class="btn btn-primary"
     >
         Update Setting
